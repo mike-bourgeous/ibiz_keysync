@@ -39,12 +39,6 @@ int open_port(const char *port)
 		return -1;
 	}
 
-	printf("Terminal settings: iflag=0x%08x oflag=0x%08x cflag=0x%08x lflag=0x%08x\n",
-			terminfo.c_iflag, terminfo.c_oflag, terminfo.c_cflag, terminfo.c_lflag);
-	for(int i = 0; i < NCCS; i++) {
-		printf("Control character %d: 0x%02x\n", i, terminfo.c_cc[i]);
-	}
-
 	terminfo.c_iflag = 0;
 	terminfo.c_oflag = 0;
 	terminfo.c_cflag = CS8 | CLOCAL | CREAD;
@@ -84,7 +78,6 @@ int main(int argc, char *argv[])
 
 	do {
 		len = read(fd, &c, 1);
-		//printf("Read 0x%zd bytes: 0x%02x\n", len, c);
 		if(len > 0 && (c & 0x80) && key_chars[c & 0x7f] != 0) {
 			// Print character keypress events
 			putchar(key_chars[c & 0x7f]);
