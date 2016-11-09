@@ -3,10 +3,12 @@
  * (C)2016 Mike Bourgeous (see LICENSE).
  */
 #include <stdio.h>
+#include <string.h>
 #include <inttypes.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <termios.h>
 
 static const char key_chars[128] = {
 	// 0    1    2    3    4    5    6    7    8    9    a    b    c    d    e    f
@@ -17,6 +19,51 @@ static const char key_chars[128] = {
 	/* Shift, ctrl, etc. - 0x34..0x3f */
 	/* Arrows - 0x7b..0x7e */
 };
+
+// Opens a serial port for completely raw I/O at 9600/8N1
+int open_port(const char *port)
+{
+	struct termios terminfo;
+	int fd;
+
+	fd = open(port, O_RDONLY);
+	if(fd == -1) {
+		perror("open");
+		return -1;
+	}
+
+	// Set terminal and line settings (echo, stop bits, etc.)
+	if(tcgetattr(fd, &terminfo)) {
+		perror("Error getting current port settings");
+		close(fd);
+		return -1;
+	}
+
+	printf("Terminal settings: iflag=0x%08x oflag=0x%08x cflag=0x%08x lflag=0x%08x\n",
+			terminfo.c_iflag, terminfo.c_oflag, terminfo.c_cflag, terminfo.c_lflag);
+	for(int i = 0; i < NCCS; i++) {
+		printf("Control character %d: 0x%02x\n", i, terminfo.c_cc[i]);
+	}
+
+	terminfo.c_iflag = 0;
+	terminfo.c_oflag = 0;
+	terminfo.c_cflag = CS8 | CLOCAL | CREAD;
+	terminfo.c_lflag = 0;
+
+	memset(terminfo.c_cc, _POSIX_VDISABLE, sizeof(terminfo.c_cc));
+	terminfo.c_cc[VMIN] = 1; // minimum 1 byte reads
+
+	cfsetispeed(&terminfo, B9600);
+	cfsetospeed(&terminfo, B9600);
+
+	if(tcsetattr(fd, TCSANOW, &terminfo)) {
+		perror("Error setting port settings");
+		close(fd);
+		return -1;
+	}
+
+	return fd;
+}
 
 int main(int argc, char *argv[])
 {
@@ -30,9 +77,8 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	fd = open(argv[1], O_RDONLY);
+	fd = open_port(argv[1]);
 	if(fd == -1) {
-		perror("open");
 		return -1;
 	}
 
@@ -43,6 +89,8 @@ int main(int argc, char *argv[])
 			// Print character keypress events
 			putchar(key_chars[c & 0x7f]);
 			fflush(stdout);
+		} else if(len < 0) {
+			perror("read");
 		}
 	} while(len > 0);
 
