@@ -4,6 +4,8 @@ The iBIZ KeySync was a battery-powered keyboard from the year 2000 designed for
 use with Pocket PC PDAs.  I found some at a surplus sale and got one working
 with a USB-to-RS232 adapter.
 
+See http://blog.mikebourgeous.com/2016/11/09/resurrecting-a-dinosaur-the-ibiz-keysync-keyboard-for-pocket-pc/
+
 #### Compiling
 
 ```bash
