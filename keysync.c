@@ -4,6 +4,7 @@
  */
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include <inttypes.h>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -16,6 +17,16 @@ static const char key_chars[128] = {
 	'y', 't', '1', '2', '3', '4', '6', '5', '=', '9', '7', '-', '8', '0', ']', 'o', // 0x10-0x1f
 	'u', '[', 'i', 'p', '\n','l', 'j', '\'','k', ';', '\\',',', '/', 'n', 'm', '.', // 0x20-0x2f
 	'\t',' ', '`', '\b', // 0x30-0x33
+	/* Shift, ctrl, etc. - 0x34..0x3f */
+	/* Arrows - 0x7b..0x7e */
+};
+
+static const char shift_chars[128] = {
+	// 0    1    2    3    4    5    6    7    8    9    a    b    c    d    e    f
+	'A', 'S', 'D', 'F', 'H', 'G', 'Z', 'X', 'C', 'V',   0, 'B', 'Q', 'W', 'E', 'R', // 0x00-0x0f
+	'Y', 'T', '!', '@', '#', '$', '^', '%', '+', '(', '&', '_', '*', ')', '}', 'O', // 0x10-0x1f
+	'U', '{', 'I', 'P', '\n','L', 'J', '"', 'K', ':', '|', '<', '?', 'N', 'M', '>', // 0x20-0x2f
+	'\t',' ', '~', '\b', // 0x30-0x33
 	/* Shift, ctrl, etc. - 0x34..0x3f */
 	/* Arrows - 0x7b..0x7e */
 };
@@ -64,6 +75,7 @@ int main(int argc, char *argv[])
 	int fd;
 	uint8_t c;
 	ssize_t len;
+	int shift = 0;
 
 	if(argc != 2) {
 		fprintf(stderr, "Usage: %s tty\n", argv[0]);
@@ -78,10 +90,26 @@ int main(int argc, char *argv[])
 
 	do {
 		len = read(fd, &c, 1);
-		if(len > 0 && (c & 0x80) && key_chars[c & 0x7f] != 0) {
-			// Print character keypress events
-			putchar(key_chars[c & 0x7f]);
-			fflush(stdout);
+		if(len > 0) {
+			if(c == 0xb8 || c == 0xbc) {
+				shift = 1;
+			} else if(c == 0x38 || c == 0x3c) {
+				shift = 0;
+			} else if(c == 0xb9) {
+				shift = !shift; // capslock
+			} else if((c & 0x80) && key_chars[c & 0x7f] != 0) {
+				// Print character keypress events
+				if(shift) {
+					c = shift_chars[c & 0x7f];
+				} else {
+					c = key_chars[c & 0x7f];
+				}
+
+				if(write(STDOUT_FILENO, &c, 1) != 1) {
+					perror("write");
+					return -1;
+				}
+			}
 		} else if(len < 0) {
 			perror("read");
 		}
